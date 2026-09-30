@@ -1,6 +1,6 @@
 # Projeto 1 — Reconhecedor léxico
 
-Implementação em C do analisador léxico solicitado no PDF da disciplina. O projeto constrói um AFND a partir da especificação, determiniza-o, remove estados inalcançáveis/mortos, adiciona o estado de erro `X` e reconhece uma sentença com geração de FITA e Tabela de Símbolos.
+Implementação em C do analisador léxico, o projeto constrói um AFND, determiniza-o, remove estados inalcançáveis/mortos, adiciona o estado de erro `X` e reconhece uma sentença com geração de FITA e Tabela de Símbolos.
 
 ## Compilação e execução
 
@@ -45,13 +45,3 @@ Linhas sem `<` no início são tokens literais. Assim, símbolos especiais podem
 - `main.c`: fluxo completo da execução.
 - `entrada.txt`: especificação do exemplo da disciplina.
 - `sentenca.txt`: sentença demonstrativa com um erro (`@`).
-- `artigo.md`: artigo solicitado no enunciado, em seções corridas.
-
-Se houver uma distribuição LaTeX instalada, a fonte SBC pode ser compilada com:
-
-```bash
-pdflatex artigo_sbc.tex
-```
-
-O PDF `artigo.pdf` já acompanha o projeto porque o ambiente de execução não possui
-`pdflatex`; no Overleaf, basta enviar `artigo_sbc.tex` e `sbc-template.sty`.
