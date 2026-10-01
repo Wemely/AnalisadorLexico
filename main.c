@@ -102,6 +102,6 @@ int main(int argc, char *argv[]) {
     if (!salvarAnalise(&analise, "fita.txt", "tabela_simbolos.txt")) {
         return EXIT_FAILURE;
     }
-    printf("\nArquivos gerados: fita.txt e tabela_simbolos.txt\n");
+    
     return analise.qtdErros == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
