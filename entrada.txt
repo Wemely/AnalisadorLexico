@@ -1,5 +1,7 @@
 se
 sai
 foi
+
 <S> ::= fA | aA | eA | iA
+
 <A> ::= fA | aA | eA | iA | e

@@ -145,7 +145,7 @@ void imprimirAnalise(const AnaliseLexica *analise) {
         return;
     }
 
-    printf("\n========== FITA ==========\nFITA: ");
+    printf("\n-----------------------  FITA -----------------------\nFITA: ");
     for (size_t i = 0; i < analise->qtdFita; i++) {
         if (i > 0) {
             printf(" ");
@@ -154,8 +154,8 @@ void imprimirAnalise(const AnaliseLexica *analise) {
     }
     printf(" $\n");
 
-    printf("\n===== TABELA DE SÍMBOLOS =====\n");
-    printf("Linha | Identificador (lexema) | Rótulo\n");
+    printf("\n-----------------------  TABELA DE SÍMBOLOS -----------------------\n");
+    printf("Linha |    Identificador       | Rótulo\n");
     printf("------+------------------------+----------------\n");
     for (size_t i = 0; i < analise->qtdRegistros; i++) {
         const RegistroSimbolo *registro = &analise->registros[i];
@@ -163,7 +163,7 @@ void imprimirAnalise(const AnaliseLexica *analise) {
                registro->identificador, registro->rotulo,
                registro->erro ? " (erro)" : "");
     }
-    printf("\nResultado: %zu erro(s) léxico(s).\n", analise->qtdErros);
+    printf("\nErros: %zu \n", analise->qtdErros);
 }
 
 bool salvarAnalise(const AnaliseLexica *analise, const char *arquivoFita,

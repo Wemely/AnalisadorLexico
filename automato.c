@@ -198,10 +198,6 @@ void imprimirTabela(const Automato *a, const char *titulo) {
     }
     printf(" Final/Rótulo\n");
     printf("--------------------------------------------------------------------------------\n");
-    if (a->estadoErro >= 0) {
-        printf("Legenda: X em uma célula = transição para o estado de erro; "
-               "a linha X representa o estado de erro e não é final.\n");
-    }
 
     for (int i = 0; i < a->qtdEstados; i++) {
         const Estado *estado = &a->estados[i];

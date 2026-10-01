@@ -98,7 +98,6 @@ int main(int argc, char *argv[]) {
     if (!analisarFonte(arquivoFonte, &afd, &analise)) {
         return EXIT_FAILURE;
     }
-    printf("\nFonte analisada: %s\n", arquivoFonte);
     imprimirAnalise(&analise);
     if (!salvarAnalise(&analise, "fita.txt", "tabela_simbolos.txt")) {
         return EXIT_FAILURE;
