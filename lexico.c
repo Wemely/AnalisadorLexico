@@ -1,5 +1,9 @@
 #include "automato.h"
 
+/*
+ * Copia um trecho seguro de origem para destino, preservando o terminador nulo.
+ * Isso evita que o lexema ultrapasse o tamanho do buffer durante a leitura da fonte.
+ */
 static void copiarTrecho(char *destino, size_t tamanho, const char *origem, size_t comprimento) {
     if (tamanho == 0) {
         return;
@@ -11,12 +15,20 @@ static void copiarTrecho(char *destino, size_t tamanho, const char *origem, size
     destino[comprimento] = '\0';
 }
 
+/*
+ * Zera o registro da análise para começar uma nova varredura da entrada.
+ * A estrutura é reutilizada sem deixar resíduos de execuções anteriores.
+ */
 void inicializarAnalise(AnaliseLexica *analise) {
     if (analise != NULL) {
         memset(analise, 0, sizeof(*analise));
     }
 }
 
+/*
+ * Grava um token reconhecido ou um erro em um registro da tabela de símbolos.
+ * Também acrescenta o rótulo na fita de saída, que representa a sequência de tokens lidos.
+ */
 static void adicionarResultado(AnaliseLexica *analise, int linha,
                                const char *lexema, const char *rotulo,
                                int tokenId, bool erro) {
@@ -40,6 +52,10 @@ static void adicionarResultado(AnaliseLexica *analise, int linha,
     }
 }
 
+/*
+ * Lê todo o conteúdo do arquivo de entrada em memória para permitir o processamento em fluxo.
+ * Isso simplifica a leitura por caractere e a detecção de tokens com base no AFD.
+ */
 static bool lerArquivoInteiro(const char *arquivo, char **conteudo, size_t *tamanho) {
     FILE *f = fopen(arquivo, "rb");
     if (f == NULL) {
@@ -78,11 +94,17 @@ static bool lerArquivoInteiro(const char *arquivo, char **conteudo, size_t *tama
     return true;
 }
 
+/*
+ * Percorre a fonte caractere por caractere e usa o AFD para reconhecer o maior token válido.
+ * Quando não há transição, considera que o símbolo é inválido e registra erro.
+ * A lógica também ignora espaços e conta a linha atual para relatório posterior.
+ */
 bool analisarFonte(const char *arquivo, const Automato *afd, AnaliseLexica *analise) {
     if (arquivo == NULL || afd == NULL || analise == NULL || afd->estadoInicial < 0) {
         return false;
     }
 
+    // Inicializa a estrutura de saída antes de registrar cada token da entrada.
     inicializarAnalise(analise);
     char *conteudo = NULL;
     size_t tamanho = 0;
@@ -94,6 +116,8 @@ bool analisarFonte(const char *arquivo, const Automato *afd, AnaliseLexica *anal
     int linha = 1;
     while (posicao < tamanho) {
         unsigned char caractere = (unsigned char)conteudo[posicao];
+
+        // Ignora separadores e atualiza a contagem de linhas para reportar erros corretamente.
         if (isspace(caractere)) {
             if (caractere == '\n') {
                 linha++;
@@ -102,11 +126,13 @@ bool analisarFonte(const char *arquivo, const Automato *afd, AnaliseLexica *anal
             continue;
         }
 
+        // Guarda o início do lexema atual para tentar reconhecer o maior token válido.
         size_t inicio = posicao;
         int estado = afd->estadoInicial;
         size_t tamanhoAceito = 0;
         int tokenAceito = TOKEN_NENHUM;
 
+        // Avança pela entrada enquanto houver transição válida e ainda não houver separador.
         while (posicao < tamanho &&
                !isspace((unsigned char)conteudo[posicao])) {
             int destino = buscarTransicao(afd, estado, conteudo[posicao]);
@@ -116,12 +142,14 @@ bool analisarFonte(const char *arquivo, const Automato *afd, AnaliseLexica *anal
             estado = destino;
             posicao++;
 
+            // Se o estado atual for final, esse prefixo já é um token aceito.
             if (estado != afd->estadoErro && afd->estados[estado].final) {
                 tamanhoAceito = posicao - inicio;
                 tokenAceito = afd->estados[estado].tokenId;
             }
         }
 
+        // Se houve pelo menos um estado final, registra o token mais longo aceito.
         if (tamanhoAceito > 0) {
             char lexema[MAX_LEXEMA];
             copiarTrecho(lexema, sizeof(lexema), conteudo + inicio, tamanhoAceito);
@@ -130,6 +158,7 @@ bool analisarFonte(const char *arquivo, const Automato *afd, AnaliseLexica *anal
             /* O trecho lido depois do último estado final será reprocessado. */
             posicao = inicio + tamanhoAceito;
         } else {
+            // Nenhuma transição válida converteu o caractere atual; então há um erro léxico.
             char lexema[2] = {conteudo[inicio], '\0'};
             adicionarResultado(analise, linha, lexema, "X", TOKEN_NENHUM, true);
             posicao = inicio + 1;
@@ -140,6 +169,10 @@ bool analisarFonte(const char *arquivo, const Automato *afd, AnaliseLexica *anal
     return true;
 }
 
+/*
+ * Exibe a fita de tokens e a tabela de símbolos em formato legível para o usuário.
+ * Isso ajuda a validar se cada lexema foi reconhecido conforme a especificação da linguagem.
+ */
 void imprimirAnalise(const AnaliseLexica *analise) {
     if (analise == NULL) {
         return;
@@ -166,6 +199,10 @@ void imprimirAnalise(const AnaliseLexica *analise) {
     printf("\nErros: %zu \n", analise->qtdErros);
 }
 
+/*
+ * Salva a fita e a tabela de símbolos em arquivos externos.
+ * Essa função serve para persistir a análise e permitir inspeção fora da execução corrente.
+ */
 bool salvarAnalise(const AnaliseLexica *analise, const char *arquivoFita,
                    const char *arquivoTabela) {
     if (analise == NULL || arquivoFita == NULL || arquivoTabela == NULL) {

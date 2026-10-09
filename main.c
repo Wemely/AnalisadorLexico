@@ -16,6 +16,10 @@
 
 #include "automato.h"
 
+/*
+ * Verifica se um arquivo existe no sistema de arquivos.
+ * Essa checagem simplifica a seleção automática da sentença quando o usuário não informa a fonte.
+ */
 static bool arquivoExiste(const char *arquivo) {
     FILE *f = fopen(arquivo, "r");
     if (f == NULL) {
@@ -25,18 +29,28 @@ static bool arquivoExiste(const char *arquivo) {
     return true;
 }
 
+/*
+ * Mostra como o programa deve ser invocado e descreve os argumentos esperados.
+ * Ajuda a manter a interface do utilitário clara para quem usa o compilador.
+ */
 static void imprimirUso(const char *programa) {
     printf("Uso: %s [especificacao.txt] [fonte.txt] [--sem-tabelas]\n", programa);
     printf("\nA especificação contém palavras reservadas e produções da gramática regular.\n");
     printf("A fonte é a sentença que será reconhecida pelo AFD.\n");
 }
 
+/*
+ * Função principal do programa.
+ * Ela interpreta os argumentos de linha de comando, carrega a especificação do idioma,
+ * constrói o AFD, analisa a fonte e salva os resultados em arquivos de saída.
+ */
 int main(int argc, char *argv[]) {
     const char *arquivoEspecificacao = "entrada.txt";
     const char *arquivoFonte = NULL;
     bool imprimirAutomatos = true;
     int posicional = 0;
 
+    // Processa parâmetros da linha de comando e define os arquivos que serão usados.
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--ajuda") == 0 || strcmp(argv[i], "-h") == 0) {
             imprimirUso(argv[0]);
@@ -64,6 +78,7 @@ int main(int argc, char *argv[]) {
         arquivoFonte = "sentenca.txt";
     }
 
+    // Cria a estrutura do AFND e depois a do AFD determinizado para reconhecer a entrada.
     Automato afnd;
     Automato afd;
     iniciaAutomato(&afnd);
@@ -77,6 +92,7 @@ int main(int argc, char *argv[]) {
         imprimirTabela(&afnd, "AFND inicial");
     }
 
+    // Determiniza a máquina e elimina estados redundantes que não afetam a linguagem.
     determinizar(&afnd, &afd);
     removerInalcancaveis(&afd);
     removerMortos(&afd);
@@ -84,6 +100,7 @@ int main(int argc, char *argv[]) {
         imprimirTabela(&afd, "AFD determinizado, sem estados inalcançáveis e mortos");
     }
 
+    // Adiciona o estado de erro para fazer o reconhecimento robusto e informar símbolos inválidos.
     adicionarEstadoErro(&afd);
     if (imprimirAutomatos) {
         imprimirTabela(&afd, "AFD completo com estado de erro X");
@@ -94,6 +111,7 @@ int main(int argc, char *argv[]) {
         return EXIT_SUCCESS;
     }
 
+    // Executa a análise léxica da fonte e salva a fita e a tabela de símbolos.
     AnaliseLexica analise;
     if (!analisarFonte(arquivoFonte, &afd, &analise)) {
         return EXIT_FAILURE;

@@ -10,12 +10,20 @@ static MapaEstado mapa[MAX_ESTADOS];
 static int qtdMapa;
 static int tokenGramatica;
 
+/*
+ * Reinicia o mapa que relaciona nomes de variáveis aos estados criados.
+ * Isso é necessário para que cada variável seja representada apenas uma vez no AFND.
+ */
 static void inicializarMapa(void) {
     memset(mapa, 0, sizeof(mapa));
     qtdMapa = 0;
     tokenGramatica = TOKEN_NENHUM;
 }
 
+/*
+ * Procura uma variável no mapa e, se ela ainda não existir, cria seu estado correspondente.
+ * Essa lógica evita duplicar estados para um mesmo nome e permite unir as produções da gramática.
+ */
 static int obterOuCriarEstado(Automato *afnd, const char *nome) {
     for (int i = 0; i < qtdMapa; i++) {
         if (strcmp(mapa[i].nome, nome) == 0) {
@@ -36,6 +44,10 @@ static int obterOuCriarEstado(Automato *afnd, const char *nome) {
     return id;
 }
 
+/*
+ * Gera um identificador sintático para cada token a partir do texto literal.
+ * O objetivo é criar rótulos válidos em C e, ao mesmo tempo, manter nomes legíveis para depuração.
+ */
 static void gerarRotuloToken(const char *token, char *rotulo, size_t tamanho) {
     if (tamanho == 0) {
         return;
@@ -60,6 +72,10 @@ static void gerarRotuloToken(const char *token, char *rotulo, size_t tamanho) {
     rotulo[pos] = '\0';
 }
 
+/*
+ * Carrega o arquivo de especificação e monta o AFND a partir de regras de token e de gramática regular.
+ * O arquivo é lido linha por linha, cada linha vira um elemento da máquina ou uma produção.
+ */
 bool carregarArquivo(const char *arquivo, Automato *afnd) {
     if (arquivo == NULL || afnd == NULL) {
         return false;
@@ -71,6 +87,7 @@ bool carregarArquivo(const char *arquivo, Automato *afnd) {
         return false;
     }
 
+    // Reinicia o mapeamento de variáveis para montar a gramática a partir do zero.
     inicializarMapa();
     /* A gramática regular do projeto usa S como símbolo inicial. */
     if (obterOuCriarEstado(afnd, "S") < 0) {
@@ -83,10 +100,13 @@ bool carregarArquivo(const char *arquivo, Automato *afnd) {
     while (fgets(linha, sizeof(linha), f) != NULL) {
         numeroLinha++;
         tiraEspaco(linha);
+
+        // Ignora linhas vazias e comentários, porque não fazem parte da gramática.
         if (linha[0] == '\0' || linha[0] == '#') {
             continue;
         }
 
+        // A primeira letra do texto distingue regra gramatical de token literal.
         if (linha[0] == '<') {
             processarGramatica(linha, afnd);
         } else {
@@ -95,6 +115,7 @@ bool carregarArquivo(const char *arquivo, Automato *afnd) {
     }
     fclose(f);
 
+    // Se a especificação não criou nenhum estado útil, a máquina não pode ser usada.
     if (afnd->qtdEstados == 0 || afnd->estadoInicial < 0) {
         fprintf(stderr, "Erro: a especificação '%s' não criou estados.\n", arquivo);
         return false;
@@ -103,6 +124,10 @@ bool carregarArquivo(const char *arquivo, Automato *afnd) {
     return true;
 }
 
+/*
+ * Interpreta uma linha contendo um token literal e a transforma em caminhos no autômato.
+ * Cada caractere do token vira uma transição do estado inicial até o estado final do token.
+ */
 void processarToken(char *token, Automato *afnd) {
     if (token == NULL || afnd == NULL) {
         return;
@@ -131,6 +156,10 @@ void processarToken(char *token, Automato *afnd) {
     definirEstadoToken(afnd, atual, tokenId);
 }
 
+/*
+ * Extrai o nome da variável em uma produção da forma <Nome>.
+ * Esse helper separa o nome da parte inteira da regra para poder reutilizar estados.
+ */
 static bool extrairNomeVariavel(const char *texto, char *nome, size_t tamanho) {
     if (texto == NULL || nome == NULL || tamanho == 0) {
         return false;
@@ -149,6 +178,10 @@ static bool extrairNomeVariavel(const char *texto, char *nome, size_t tamanho) {
     return true;
 }
 
+/*
+ * Separa uma produção em símbolo terminal e variável seguinte.
+ * Isso permite transformar regras do tipo a<A> em transições no autômato.
+ */
 static bool extrairProducaoTerminal(const char *producao, char *simbolo,
                                     char *variavel, size_t tamanhoVariavel) {
     if (producao == NULL || simbolo == NULL || variavel == NULL || tamanhoVariavel == 0) {
@@ -187,11 +220,16 @@ static bool extrairProducaoTerminal(const char *producao, char *simbolo,
     return false;
 }
 
+/*
+ * Constrói o AFND a partir de uma regra de produção da gramática regular.
+ * Cada alternativa da direita vira uma transição que conecta o estado da variável ao destino correspondente.
+ */
 void processarGramatica(char *linha, Automato *afnd) {
     if (linha == NULL || afnd == NULL) {
         return;
     }
 
+    // Procura o separador ::= para distinguir o lado esquerdo da regra do lado direito.
     char *separador = strstr(linha, "::=");
     if (separador == NULL) {
         fprintf(stderr, "Aviso: produção ignorada (faltou ::=): %s\n", linha);
@@ -207,33 +245,41 @@ void processarGramatica(char *linha, Automato *afnd) {
     esquerda[tamanhoEsquerda] = '\0';
     tiraEspaco(esquerda);
 
+    // Extrai o nome da variável da esquerda, como <S> ou <ID>.
     char nomeVariavel[64];
     if (!extrairNomeVariavel(esquerda, nomeVariavel, sizeof(nomeVariavel))) {
         fprintf(stderr, "Aviso: variável inválida na produção: %s\n", linha);
         return;
     }
 
+    // Garante que o estado dessa variável exista no AFND para receber as transições.
     int estadoOrigem = obterOuCriarEstado(afnd, nomeVariavel);
     if (estadoOrigem < 0) {
         fprintf(stderr, "Aviso: não foi possível criar o estado <%s>.\n", nomeVariavel);
         return;
     }
 
+    // Cria um token genérico para as produções da gramática regular, quando ainda não existir.
     if (tokenGramatica == TOKEN_NENHUM) {
         tokenGramatica = registrarToken(afnd, "<gramatica-regular>", "IDENTIFICADOR");
     }
 
+    // Divide as alternativas do lado direito pela barra '|' e monta cada ramificação.
     char direita[MAX_LINHA];
     snprintf(direita, sizeof(direita), "%s", separador + 3);
     char *producao = strtok(direita, "|");
     while (producao != NULL) {
         tiraEspaco(producao);
+
+        // Epsilon significa que a variável pode aceitar imediatamente sem consumir símbolo.
         if (strcmp(producao, "ε") == 0 || strcmp(producao, "EPSILON") == 0 ||
             strcmp(producao, "epsilon") == 0) {
             definirEstadoToken(afnd, estadoOrigem, tokenGramatica);
         } else {
             char simbolo;
             char proximaVariavel[64];
+
+            // Caso a regra seja do formato a<A> ou a<Nome>, cria transição de terminal para outra variável.
             if (extrairProducaoTerminal(producao, &simbolo, proximaVariavel,
                                         sizeof(proximaVariavel))) {
                 int destino = obterOuCriarEstado(afnd, proximaVariavel);
@@ -241,6 +287,7 @@ void processarGramatica(char *linha, Automato *afnd) {
                     adicionarTransicao(afnd, estadoOrigem, destino, simbolo);
                 }
             } else if (strlen(producao) == 1) {
+                // Regra terminal simples, como 'a' ou '1', gera um estado final específico.
                 int estadoFinal = adicionarEstado(afnd, false);
                 if (estadoFinal >= 0) {
                     adicionarTransicao(afnd, estadoOrigem, estadoFinal, producao[0]);

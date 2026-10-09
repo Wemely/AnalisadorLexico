@@ -1,5 +1,9 @@
 #include "automato.h"
 
+/*
+ * Ordena os estados de um subconjunto para padronizar a representação do conjunto.
+ * Isso permite que estados equivalentes sejam comparados de forma determinística.
+ */
 static void ordenarSubconjunto(int *sub, int qtd) {
     for (int i = 0; i < qtd - 1; i++) {
         for (int j = i + 1; j < qtd; j++) {
@@ -12,6 +16,10 @@ static void ordenarSubconjunto(int *sub, int qtd) {
     }
 }
 
+/*
+ * Compara dois subconjuntos para verificar se representam o mesmo conjunto de estados.
+ * Essa checagem é o núcleo da determinização, porque cada novo estado do AFD depende de um conjunto único.
+ */
 static bool subconjuntosIguais(const int *s1, int q1, const int *s2, int q2) {
     if (q1 != q2) {
         return false;
@@ -24,6 +32,10 @@ static bool subconjuntosIguais(const int *s1, int q1, const int *s2, int q2) {
     return true;
 }
 
+/*
+ * Busca um estado do AFD cujo subconjunto já foi criado.
+ * Se o mesmo conjunto aparecer novamente, ele é reaproveitado em vez de criar duplicatas.
+ */
 static int buscarEstadoPorSubconjunto(const Automato *afd, const int *sub, int qtd) {
     for (int i = 0; i < afd->qtdEstados; i++) {
         if (subconjuntosIguais(afd->estados[i].subconjunto,
@@ -34,6 +46,10 @@ static int buscarEstadoPorSubconjunto(const Automato *afd, const int *sub, int q
     return -1;
 }
 
+/*
+ * Avalia um subconjunto do AFND para verificar se ele representa um estado final e qual token deve prevalecer.
+ * O token com menor identificador tem prioridade, como definido no projeto.
+ */
 static int tokenDoSubconjunto(const Automato *afnd, const int *sub, int qtd,
                               bool *ehFinal) {
     int tokenId = TOKEN_NENHUM;
@@ -55,17 +71,23 @@ static int tokenDoSubconjunto(const Automato *afnd, const int *sub, int qtd,
     return tokenId;
 }
 
+/*
+ * Determiniza o AFND, transformando cada conjunto de estados em um único estado do AFD.
+ * A ideia é explorar todos os símbolos do alfabeto e montar o conjunto de destinos possíveis para cada estado atual.
+ */
 void determinizar(const Automato *afnd, Automato *afd) {
     iniciaAutomato(afd);
     if (afnd == NULL || afd == NULL || afnd->estadoInicial < 0 || afnd->qtdEstados == 0) {
         return;
     }
 
+    // Copia o alfabeto e a tabela de tokens do AFND para manter a mesma linguagem no AFD.
     memcpy(afd->alfabeto, afnd->alfabeto, sizeof(afnd->alfabeto));
     afd->qtdSimbolos = afnd->qtdSimbolos;
     memcpy(afd->tokens, afnd->tokens, sizeof(afnd->tokens));
     afd->qtdTokens = afnd->qtdTokens;
 
+    // O estado inicial do AFD representa o conjunto de estados alcançáveis imediatamente do AFND.
     int inicial = adicionarEstado(afd, afnd->estados[afnd->estadoInicial].final);
     if (inicial < 0) {
         return;
@@ -75,6 +97,7 @@ void determinizar(const Automato *afnd, Automato *afd) {
     afd->estados[inicial].qtdSubconjunto = 1;
     afd->estados[inicial].tokenId = afnd->estados[afnd->estadoInicial].tokenId;
 
+    // Para cada estado já criado, calcula o próximo subconjunto para cada símbolo do alfabeto.
     for (int processados = 0; processados < afd->qtdEstados; processados++) {
         Estado *atual = &afd->estados[processados];
         for (int i = 0; i < afd->qtdSimbolos; i++) {
@@ -82,6 +105,7 @@ void determinizar(const Automato *afnd, Automato *afd) {
             int novoSub[MAX_ESTADOS];
             int qtdNovos = 0;
 
+            // Coleta todos os destinos do AFND que podem ser alcançados com o mesmo símbolo.
             for (int j = 0; j < atual->qtdSubconjunto; j++) {
                 int idAfnd = atual->subconjunto[j];
                 if (idAfnd < 0 || idAfnd >= afnd->qtdEstados) {
@@ -107,6 +131,7 @@ void determinizar(const Automato *afnd, Automato *afd) {
                 }
             }
 
+            // Se não existem destinos possíveis, esse símbolo não gera uma transição do AFD.
             if (qtdNovos == 0) {
                 continue;
             }
@@ -129,6 +154,10 @@ void determinizar(const Automato *afnd, Automato *afd) {
     }
 }
 
+/*
+ * Copia metadados do estado original para o novo estado da versão simplificada.
+ * Isso preserva informações como token, estado final e subconjunto sem duplicar lógica.
+ */
 static void copiarMetadadosEstado(const Estado *origem, Estado *destino) {
     destino->final = origem->final;
     destino->tokenId = origem->tokenId;
@@ -137,11 +166,16 @@ static void copiarMetadadosEstado(const Estado *origem, Estado *destino) {
            sizeof(int) * (size_t)origem->qtdSubconjunto);
 }
 
+/*
+ * Remove estados que não são alcançáveis a partir do estado inicial.
+ * Essa limpeza reduz o tamanho do autômato sem afetar a linguagem reconhecida.
+ */
 void removerInalcancaveis(Automato *a) {
     if (a == NULL || a->qtdEstados == 0 || a->estadoInicial < 0) {
         return;
     }
 
+    // BFS para descobrir quais estados são alcançáveis a partir do estado inicial.
     bool alcancaveis[MAX_ESTADOS] = {false};
     int fila[MAX_ESTADOS];
     int frente = 0;
@@ -160,6 +194,7 @@ void removerInalcancaveis(Automato *a) {
         }
     }
 
+    // Copia apenas os estados que permanecem acessíveis para formar uma versão reduzida do AFD.
     int novoId[MAX_ESTADOS];
     for (int i = 0; i < MAX_ESTADOS; i++) {
         novoId[i] = -1;
@@ -197,11 +232,16 @@ void removerInalcancaveis(Automato *a) {
     *a = novo;
 }
 
+/*
+ * Remove estados mortos, ou seja, estados que não levam a um estado final.
+ * Isso simplifica a máquina e evita caminhos inúteis na análise léxica.
+ */
 void removerMortos(Automato *a) {
     if (a == NULL || a->qtdEstados == 0 || a->estadoInicial < 0) {
         return;
     }
 
+    // Marca como vivos os estados que alcançam algum final e percorre o grafo de trás para frente.
     bool vivos[MAX_ESTADOS] = {false};
     int fila[MAX_ESTADOS];
     int frente = 0;
@@ -233,6 +273,7 @@ void removerMortos(Automato *a) {
     /* Mesmo sem caminho para um final, o estado inicial deve permanecer válido. */
     vivos[a->estadoInicial] = true;
 
+    // Mantém somente os estados vivos para reduzir o autômato sem perder a linguagem.
     int novoId[MAX_ESTADOS];
     for (int i = 0; i < MAX_ESTADOS; i++) {
         novoId[i] = -1;
@@ -270,21 +311,28 @@ void removerMortos(Automato *a) {
     *a = novo;
 }
 
+/*
+ * Cria um estado especial que representa qualquer transição indefinida.
+ * Ele redireciona entradas inválidas para um único ponto de erro, facilitando o reconhecimento léxico.
+ */
 void adicionarEstadoErro(Automato *a) {
     if (a == NULL || a->estadoErro >= 0) {
         return;
     }
 
+    // Cria o estado especial que representa qualquer entrada indefinida no autômato.
     int idErro = adicionarEstado(a, false);
     if (idErro < 0) {
         return;
     }
     a->estadoErro = idErro;
 
+    // O estado de erro permanece em laço para qualquer símbolo do alfabeto.
     for (int i = 0; i < a->qtdSimbolos; i++) {
         adicionarTransicao(a, idErro, idErro, a->alfabeto[i]);
     }
 
+    // Redireciona cada transição inexistente para o estado de erro para tornar o AFD completo.
     int qtdOriginal = a->qtdEstados - 1;
     for (int i = 0; i < qtdOriginal; i++) {
         for (int j = 0; j < a->qtdSimbolos; j++) {
